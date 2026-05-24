@@ -1,111 +1,13 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-import plotly.express as px
-from sklearn.ensemble import RandomForestRegressor
 from streamlit_ace import st_ace
-import re
 
-# Try to import radon for actual complexity comparison (Python only)
-try:
-    from radon.complexity import cc_visit
-    RADON_AVAILABLE = True
-except ImportError:
-    RADON_AVAILABLE = False
+# --- Moduler Imports ---
+from models.model_pipeline import train_model
+from src.extraction import extract_features_heuristics, get_actual_complexity
+from src.visualization import create_gauge_chart, create_radar_chart, create_donut_chart
 
-# --- STEP 1: Feature Extraction ---
-def extract_features_heuristics(code_str, language):
-    """Extracts structural features, variables, and code composition."""
-    code_str_lower = code_str.lower()
-    raw_lines = code_str.split('\n')
-    total_lines = len(raw_lines)
-    
-    # Composition metrics
-    blank_lines = len([line for line in raw_lines if line.strip() == ''])
-    comments = len(re.findall(r'(#|//|/\*|\*/)', code_str))
-    actual_code_lines = total_lines - blank_lines - comments
-    if actual_code_lines < 0: actual_code_lines = 0
-    
-    # Structural markers
-    loops = len(re.findall(r'\b(for|while|do)\b', code_str_lower))
-    conditionals = len(re.findall(r'\b(if|else|elif|switch|case)\b', code_str_lower))
-    variables = len(re.findall(r'\b[a-zA-Z_]\w*\s*=\s*[^=]', code_str))
-    classes = len(re.findall(r'\bclass\b', code_str_lower))
-    
-    if language == "Python":
-        functions = len(re.findall(r'\bdef\b', code_str_lower))
-    elif language == "JavaScript":
-        functions = len(re.findall(r'\b(function|=>)\b', code_str_lower))
-    else: 
-        functions = len(re.findall(r'\b(void|int|public|private|String)\s+\w+\s*\(', code_str))
-        
-    # Estimate nesting depth
-    max_depth = 0
-    current_depth = 0
-    for char in code_str:
-        if char == '{': current_depth += 1
-        elif char == '}': current_depth = max(0, current_depth - 1)
-        max_depth = max(max_depth, current_depth)
-        
-    if language == "Python":
-        max_depth = max([len(line) - len(line.lstrip()) for line in raw_lines if line.strip()] + [0]) // 4
-        
-    # Time Complexity Heuristic
-    if loops == 0:
-        time_complexity = "O(1) or O(log n)"
-    elif max_depth <= 1:
-        time_complexity = "O(n)"
-    elif max_depth == 2:
-        time_complexity = "O(n^2)"
-    else:
-        time_complexity = "O(n^3) or higher"
-        
-    return {
-        'loops': loops, 'conditionals': conditionals, 'functions': functions,
-        'variables': variables, 'classes': classes, 'total_lines': total_lines, 
-        'actual_code_lines': actual_code_lines, 'comments': comments, 
-        'blank_lines': blank_lines, 'max_depth': max_depth, 'time_complexity': time_complexity
-    }
-
-def get_actual_complexity(code_str, language):
-    if language != "Python" or not RADON_AVAILABLE: return "N/A (Python Only)"
-    try:
-        blocks = cc_visit(code_str)
-        complexity = sum([block.complexity for block in blocks])
-        return complexity if complexity > 0 else 1
-    except Exception: return 1
-
-# --- STEP 2: ML Model Training ---
-@st.cache_resource
-def train_model():
-    np.random.seed(42)
-    n_samples = 5000
-    
-    loops = np.random.poisson(2, n_samples)
-    conditionals = np.random.poisson(3, n_samples)
-    functions = np.random.poisson(1.5, n_samples)
-    variables = np.random.poisson(5, n_samples)
-    classes = np.random.poisson(0.5, n_samples)
-    max_depth = np.ceil((loops + conditionals) / 3).astype(int) + np.random.randint(0, 2, n_samples)
-    
-    complexity_label = (loops * 2) + conditionals + (max_depth * 1.5) + (variables * 0.1) + np.random.normal(0, 1, n_samples)
-    complexity_label = np.maximum(1, np.round(complexity_label))
-    
-    df = pd.DataFrame({
-        'loops': loops, 'conditionals': conditionals, 'functions': functions, 
-        'variables': variables, 'classes': classes, 'max_depth': max_depth, 
-        'complexity_label': complexity_label
-    })
-    
-    X = df[['loops', 'conditionals', 'functions', 'variables', 'classes', 'max_depth']]
-    y = df['complexity_label']
-    
-    model = RandomForestRegressor(n_estimators=100, max_depth=10, random_state=42)
-    model.fit(X, y)
-    return model
-
-# --- STEP 3: UI Layout (Centered) ---
+# --- UI Layout (Centered) ---
 st.set_page_config(page_title="AI Code Complexity Analyzer", layout="centered")
 
 st.title("🧠 AI Code Complexity Analyzer")
@@ -127,7 +29,10 @@ user_code = st_ace(
 
 # Analysis Section
 if user_code:
+    # 1. Load the Model Pipeline (from models/model_pipeline.py)
     model = train_model()
+    
+    # 2. Extract Features (from src/extraction.py)
     features = extract_features_heuristics(user_code, language_choice)
     actual_complexity = get_actual_complexity(user_code, language_choice)
     
@@ -137,6 +42,7 @@ if user_code:
         'classes': features['classes'], 'max_depth': features['max_depth']
     }])
     
+    # 3. Predictions
     predicted_complexity = model.predict(feature_vector)[0]
     maintainability = max(0, min(100, 100 - (predicted_complexity * 2.5) + (features['comments'] * 2)))
 
@@ -164,30 +70,30 @@ if user_code:
     m5.metric("Est. Time Complexity", features['time_complexity'])
     m6.markdown(f"**Bug Risk:** <span style='color:{risk_color}; font-size: 18px;'>{risk}</span>", unsafe_allow_html=True)
 
-    # Gauges Row
+    # 4. Generate Visualizations (from src/visualization.py)
     st.markdown("### Complexity Visualizations")
     g1, g2 = st.columns(2)
     
     with g1:
-        fig_comp = go.Figure(go.Indicator(
-            mode = "gauge+number", value = predicted_complexity, title = {'text': "Complexity Score"},
-            gauge = {'axis': {'range': [None, max(20, predicted_complexity + 5)]}, 'bar': {'color': "darkblue"},
-                     'steps': [{'range': [0, 5], 'color': "lightgreen"},
-                               {'range': [5, 15], 'color': "navajowhite"},
-                               {'range': [15, 30], 'color': "salmon"}]}
-        ))
-        fig_comp.update_layout(height=250, margin=dict(l=20, r=20, t=30, b=20))
+        comp_steps = [
+            {'range': [0, 5], 'color': "lightgreen"},
+            {'range': [5, 15], 'color': "navajowhite"},
+            {'range': [15, 30], 'color': "salmon"}
+        ]
+        fig_comp = create_gauge_chart(
+            predicted_complexity, "Complexity Score", max(20, predicted_complexity + 5), comp_steps
+        )
         st.plotly_chart(fig_comp, use_container_width=True)
 
     with g2:
-        fig_maint = go.Figure(go.Indicator(
-            mode = "gauge+number", value = maintainability, title = {'text': "Maintainability"},
-            gauge = {'axis': {'range': [0, 100]}, 'bar': {'color': "darkblue"},
-                     'steps': [{'range': [0, 40], 'color': "salmon"},
-                               {'range': [40, 75], 'color': "navajowhite"},
-                               {'range': [75, 100], 'color': "lightgreen"}]}
-        ))
-        fig_maint.update_layout(height=250, margin=dict(l=20, r=20, t=30, b=20))
+        maint_steps = [
+            {'range': [0, 40], 'color': "salmon"},
+            {'range': [40, 75], 'color': "navajowhite"},
+            {'range': [75, 100], 'color': "lightgreen"}
+        ]
+        fig_maint = create_gauge_chart(
+            maintainability, "Maintainability", 100, maint_steps
+        )
         st.plotly_chart(fig_maint, use_container_width=True)
 
     # Structural Breakdown
@@ -195,17 +101,11 @@ if user_code:
     c1, c2 = st.columns(2)
     
     with c1:
-        categories = ['Loops', 'Conditionals', 'Functions', 'Variables', 'Max Depth']
-        values = [features['loops'], features['conditionals'], features['functions'], features['variables'], features['max_depth']]
-        fig_radar = go.Figure(data=go.Scatterpolar(r=values + [values[0]], theta=categories + [categories[0]], fill='toself'))
-        fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True)), showlegend=False, height=250, margin=dict(l=30, r=30, t=30, b=20), title="Feature Density")
+        fig_radar = create_radar_chart(features)
         st.plotly_chart(fig_radar, use_container_width=True)
         
     with c2:
-        comp_labels = ['Code', 'Comments', 'Blank Lines']
-        comp_values = [features['actual_code_lines'], features['comments'], features['blank_lines']]
-        fig_donut = go.Figure(data=[go.Pie(labels=comp_labels, values=comp_values, hole=.5, marker_colors=['#636EFA', '#00CC96', '#E45756'])])
-        fig_donut.update_layout(height=250, margin=dict(l=20, r=20, t=30, b=20), title="File Composition")
+        fig_donut = create_donut_chart(features)
         st.plotly_chart(fig_donut, use_container_width=True)
     
     # Text Data & Suggestions
@@ -220,7 +120,7 @@ if user_code:
     else:
         st.success("✅ Code structure looks highly maintainable.")
 
-# --- STEP 4: Information Footer ---
+# --- Information Footer ---
 st.markdown("---")
 st.markdown("## Glossary & Technical Details")
 
@@ -230,7 +130,6 @@ st.markdown("""
 * **Maintainability Score:** A heuristic measurement (0-100) determining how easy the code is to support and change. It penalizes high complexity and rewards good commenting practices.
 * **Estimated Time Complexity:** A Big-O notation estimate ($O(n)$, $O(n^2)$, etc.) based on the maximum nesting depth of iterative loops within the code block. 
 """)
-
 
 st.markdown("### Model Details")
 st.markdown("""
