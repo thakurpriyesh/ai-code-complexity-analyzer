@@ -9,7 +9,7 @@ By combining heuristic-based feature extraction, static analysis techniques, and
 # 🌐 Live Demo
 
 🔗 **Try the App Here:**  
-https://ai-code-complexity-analyzer.streamlit.app
+https://complexityIQ.streamlit.app
 
 ---
 
@@ -60,17 +60,12 @@ Uses `streamlit-ace` for a smooth in-browser coding and testing experience.
 
 # 🖼️ Screenshots
 
-> Add your screenshots here
-
 ## Dashboard Overview
-![Dashboard Screenshot](screenshots/dashboard.png)
+![Dashboard Screenshot](images/dashboard.png)
 
 ## Complexity Analysis
-![Complexity Screenshot](screenshots/complexity.png)
-
-## Maintainability Metrics
-![Maintainability Screenshot](screenshots/maintainability.png)
-
+![Complexity Screenshot](images/complexity1.png)
+![Complexity Screenshot](images/complexity2.png)
 ---
 
 # 🛠️ Tech Stack
