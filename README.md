@@ -1,4 +1,4 @@
-# ComplexityIQ 🧠⚡
+# complexityIQ 🧠⚡
 
 An intelligent, ML-powered code analysis platform built with Streamlit that helps developers understand the structural complexity, maintainability, and potential bug risk of source code.
 

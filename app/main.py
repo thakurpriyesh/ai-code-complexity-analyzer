@@ -17,7 +17,7 @@ from src.visualization import create_gauge_chart, create_radar_chart, create_don
 # --- UI Layout (Centered) ---
 st.set_page_config(page_title="ComplexityIQ", layout="centered")
 
-st.title("🧠 ComplexityIQ")
+st.title("🧠 complexityIQ")
 st.markdown("Paste your code below for deep structural analysis, bug risk prediction, and maintainability scoring.")
 
 # Input Section
