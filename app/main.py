@@ -15,9 +15,9 @@ from src.extraction import extract_features_heuristics, get_actual_complexity
 from src.visualization import create_gauge_chart, create_radar_chart, create_donut_chart
 
 # --- UI Layout (Centered) ---
-st.set_page_config(page_title="AI Code Complexity Analyzer", layout="centered")
+st.set_page_config(page_title="ComplexityIQ", layout="centered")
 
-st.title("🧠 AI Code Complexity Analyzer")
+st.title("🧠 ComplexityIQ")
 st.markdown("Paste your code below for deep structural analysis, bug risk prediction, and maintainability scoring.")
 
 # Input Section
